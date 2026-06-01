@@ -78,10 +78,10 @@
                             <td class="px-6 py-4">Bintara</td>
                             <td class="px-6 py-4">Bekasi Barat</td>
                             <td class="px-6 py-4">
-                                <button type="button"
+                                <a href="{{ route('schools.show', 1) }}"
                                     class="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-black/20">
                                     Detail
-                                </button>
+                                </a>
                             </td>
                         </tr>
                         <tr>
