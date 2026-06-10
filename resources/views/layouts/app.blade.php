@@ -22,8 +22,12 @@
             ['key' => 'peta', 'label' => 'Peta', 'href' => route('map')],
             ['key' => 'daftar', 'label' => 'Daftar Sekolah', 'href' => route('schools.index')],
             ['key' => 'statistik', 'label' => 'Statistik', 'href' => route('statistics.index')],
-            ['key' => 'lapor', 'label' => 'Lapor Kerusakan', 'href' => '#'],
         ];
+
+        // Tampilkan menu Lapor Kerusakan hanya untuk admin & operator
+        if (Auth::check() && Auth::user()->hasRole('admin', 'operator')) {
+            $navItems[] = ['key' => 'kerusakan', 'label' => 'Lapor Kerusakan', 'href' => route('kerusakan.index')];
+        }
     @endphp
 
     <div class="relative min-h-screen overflow-hidden">
@@ -55,22 +59,36 @@
                         </nav>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button type="button"
-                            class="hidden rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-black/20 hover:text-slate-900 sm:inline-flex">
-                            Masuk
-                        </button>
-                        <button type="button"
-                            class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white shadow-sm transition hover:border-black/20"
-                            aria-label="Profil">
-                            <svg viewBox="0 0 24 24" class="h-5 w-5 text-slate-600" fill="none" stroke="currentColor"
-                                stroke-width="1.5">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M4.5 20.118a7.5 7.5 0 0 1 15 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.5-1.632Z" />
-                            </svg>
-                        </button>
+                        @auth
+                            <span class="hidden text-sm text-slate-600 sm:inline">{{ Auth::user()->username }}</span>
+                            <form action="{{ route('logout') }}" method="POST">
+                                @csrf
+                                <button type="submit"
+                                    class="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-black/20 hover:text-slate-900 inline-flex items-center gap-2">
+                                    <svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor">
+                                        <path fill-rule="evenodd"
+                                            d="M3 4.25A2.25 2.25 0 0 1 5.25 2h5.5A2.25 2.25 0 0 1 13 4.25v2a.75.75 0 0 1-1.5 0v-2a.75.75 0 0 0-.75-.75h-5.5a.75.75 0 0 0-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 0 0 .75-.75v-2a.75.75 0 0 1 1.5 0v2A2.25 2.25 0 0 1 10.75 18h-5.5A2.25 2.25 0 0 1 3 15.75V4.25Z"
+                                            clip-rule="evenodd" />
+                                        <path fill-rule="evenodd"
+                                            d="M19 10a.75.75 0 0 0-.75-.75H8.704l1.048-.943a.75.75 0 1 0-1.004-1.114l-2.5 2.25a.75.75 0 0 0 0 1.114l2.5 2.25a.75.75 0 1 0 1.004-1.114l-1.048-.943h9.546A.75.75 0 0 0 19 10Z"
+                                            clip-rule="evenodd" />
+                                    </svg>
+                                    Keluar
+                                </button>
+                            </form>
+                        @else
+                            <a href="{{ route('login') }}"
+                                class="hidden rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-black/20 hover:text-slate-900 sm:inline-flex items-center gap-2">
+                                <svg viewBox="0 0 20 20" class="h-4 w-4" fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                        d="M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z"
+                                        clip-rule="evenodd" />
+                                </svg>
+                                Portal Admin
+                            </a>
+                        @endauth
                     </div>
+
                 </div>
             </header>
 
