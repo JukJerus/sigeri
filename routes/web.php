@@ -45,7 +45,58 @@ Route::get('/sekolah', function (\Illuminate\Http\Request $request) {
 })->name('schools.index');
 
 Route::get('/statistik', function () {
-    return view('pages.statistics.index', ['active' => 'statistik']);
+    $totalSekolah   = App\Models\Sekolah::count();
+    $totalKecamatan = App\Models\Kecamatan::count();
+    $totalKelurahan = App\Models\Kelurahan::count();
+
+    // Jumlah sekolah per kecamatan
+    $perKecamatan = App\Models\Kecamatan::withCount(['kelurahan as sekolah_count' => function ($q) {
+        $q->join('sekolahs', 'sekolahs.kelurahan_id', '=', 'kelurahans.id')
+          ->select(Illuminate\Support\Facades\DB::raw('count(sekolahs.id)'));
+    }])->orderBy('nama')->get();
+
+    // Query langsung agar akurat
+    $sekolahPerKecamatan = Illuminate\Support\Facades\DB::table('sekolahs')
+        ->join('kelurahans', 'sekolahs.kelurahan_id', '=', 'kelurahans.id')
+        ->join('kecamatans', 'kelurahans.kecamatan_id', '=', 'kecamatans.id')
+        ->select('kecamatans.nama', Illuminate\Support\Facades\DB::raw('count(sekolahs.id) as total'))
+        ->groupBy('kecamatans.nama')
+        ->orderBy('kecamatans.nama')
+        ->get();
+
+    // Distribusi akreditasi
+    $akreditasi = App\Models\Sekolah::selectRaw("COALESCE(akreditasi, 'Belum') as label, count(*) as total")
+        ->groupBy('akreditasi')
+        ->orderByRaw("FIELD(akreditasi, 'A', 'B', 'C') ASC")
+        ->get();
+
+    // Total siswa & guru
+    $totalSiswaL = App\Models\Sekolah::sum('jumlah_siswa_laki') ?: 0;
+    $totalSiswaP = App\Models\Sekolah::sum('jumlah_siswa_perempuan') ?: 0;
+    $totalGuru   = App\Models\Sekolah::sum('jumlah_guru') ?: 0;
+    $totalTendik = App\Models\Sekolah::sum('jumlah_tendik') ?: 0;
+
+    // Rata-rata fasilitas
+    $fasilitasAvg = App\Models\Fasilitas::selectRaw('
+        ROUND(AVG(jumlah_kelas), 1) as avg_kelas,
+        ROUND(AVG(jumlah_perpustakaan), 1) as avg_perpus,
+        ROUND(AVG(jumlah_lab_komputer), 1) as avg_lab_komputer,
+        ROUND(AVG(jumlah_lab_ipa), 1) as avg_lab_ipa
+    ')->first();
+
+    return view('pages.statistics.index', [
+        'active'              => 'statistik',
+        'totalSekolah'        => $totalSekolah,
+        'totalKecamatan'      => $totalKecamatan,
+        'totalKelurahan'      => $totalKelurahan,
+        'sekolahPerKecamatan' => $sekolahPerKecamatan,
+        'akreditasi'          => $akreditasi,
+        'totalSiswaL'         => $totalSiswaL,
+        'totalSiswaP'         => $totalSiswaP,
+        'totalGuru'           => $totalGuru,
+        'totalTendik'         => $totalTendik,
+        'fasilitasAvg'        => $fasilitasAvg,
+    ]);
 })->name('statistics.index');
 
 Route::get('/sekolah/{id}', function ($id) {
