@@ -81,4 +81,53 @@ class User extends Authenticatable
 
         return in_array($this->role?->nama_role, $allowedNames, true);
     }
+
+    // ── Akses Sekolah ─────────────────────────────────
+
+    /**
+     * Cek apakah user boleh mengakses sekolah tertentu.
+     *
+     * - Admin: boleh akses SEMUA sekolah.
+     * - Operator: hanya sekolah yang operator_id-nya milik dia.
+     *
+     * Gunakan method ini di setiap controller yang menyentuh data sekolah:
+     *   if (! $user->canAccessSekolah($sekolahId)) abort(403);
+     */
+    public function canAccessSekolah(int $sekolahId): bool
+    {
+        // Admin boleh semua
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        // Operator cek apakah sekolah ditugaskan padanya
+        if ($this->isOperator()) {
+            return Sekolah::where('id', $sekolahId)
+                ->where('operator_id', $this->operator?->id)
+                ->exists();
+        }
+
+        return false;
+    }
+
+    /**
+     * Ambil ID sekolah yang boleh diakses user.
+     *
+     * - Admin: null (artinya semua, jangan filter).
+     * - Operator: array ID sekolah miliknya.
+     *
+     * Contoh pakai di query:
+     *   $ids = $user->getSekolahIds();
+     *   $query->when($ids !== null, fn($q) => $q->whereIn('sekolah_id', $ids));
+     */
+    public function getSekolahIds(): ?array
+    {
+        if ($this->isAdmin()) {
+            return null; // null = semua
+        }
+
+        return Sekolah::where('operator_id', $this->operator?->id)
+            ->pluck('id')
+            ->toArray();
+    }
 }

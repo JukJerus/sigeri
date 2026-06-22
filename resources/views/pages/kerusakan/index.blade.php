@@ -71,6 +71,7 @@
                     <thead class="border-b border-black/10 text-xs uppercase tracking-[0.2em] text-slate-500">
                         <tr>
                             <th class="px-6 py-4">Sekolah</th>
+                            <th class="px-6 py-4">Foto</th>
                             <th class="px-6 py-4">Jenis Fasilitas</th>
                             <th class="px-6 py-4">Jumlah</th>
                             <th class="px-6 py-4">Kondisi</th>
@@ -86,6 +87,26 @@
                             <tr class="border-b border-black/5 hover:bg-slate-50">
                                 <td class="px-6 py-4 font-semibold text-slate-900">
                                     {{ $item->sekolah->nama ?? '-' }}
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if ($item->fotos->count() > 0)
+                                        <div class="flex items-center gap-1">
+                                            <a href="{{ asset('storage/' . $item->fotos->first()->file_foto) }}"
+                                                target="_blank">
+                                                <img src="{{ asset('storage/' . $item->fotos->first()->file_foto) }}"
+                                                    alt="Foto kerusakan"
+                                                    class="h-10 w-14 rounded-lg object-cover border border-black/10 hover:opacity-80 transition" />
+                                            </a>
+                                            @if ($item->fotos->count() > 1)
+                                                <span
+                                                    class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                                                    +{{ $item->fotos->count() - 1 }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-slate-400">-</span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4">{{ $item->jenis }}</td>
                                 <td class="px-6 py-4 font-semibold">{{ $item->jumlah_kerusakan }}</td>

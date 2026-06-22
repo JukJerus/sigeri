@@ -9,8 +9,30 @@ class Galeri extends Model
 {
     protected $guarded = ['id'];
 
+    /**
+     * Tipe foto galeri.
+     */
+    public const TIPE_SEKOLAH   = 'sekolah';
+    public const TIPE_FASILITAS = 'fasilitas';
+
     public function sekolah(): BelongsTo
     {
         return $this->belongsTo(Sekolah::class);
+    }
+
+    /**
+     * Scope: hanya foto sekolah.
+     */
+    public function scopeSekolah($query)
+    {
+        return $query->where('tipe', self::TIPE_SEKOLAH);
+    }
+
+    /**
+     * Scope: hanya foto fasilitas.
+     */
+    public function scopeFasilitas($query)
+    {
+        return $query->where('tipe', self::TIPE_FASILITAS);
     }
 }

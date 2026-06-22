@@ -32,7 +32,7 @@
                     </div>
                 @endif
 
-                <form action="{{ route('kerusakan.store') }}" method="POST" class="space-y-6">
+                <form action="{{ route('kerusakan.store') }}" method="POST" enctype="multipart/form-data" class="space-y-6">
                     @csrf
 
                     {{-- Sekolah --}}
@@ -109,6 +109,30 @@
                             class="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">{{ old('deskripsi') }}</textarea>
                     </div>
 
+                    {{-- Foto Dokumentasi --}}
+                    <div>
+                        <label for="foto"
+                            class="mb-2 block text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            Foto Dokumentasi <span class="text-slate-400">(opsional, maks. 5 foto)</span>
+                        </label>
+                        <div class="relative">
+                            <input id="foto" name="foto[]" type="file" accept="image/jpeg,image/png,image/webp"
+                                multiple
+                                class="w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-slate-700 hover:file:bg-slate-200 transition focus:outline-none" />
+                        </div>
+                        <p class="mt-1.5 text-xs text-slate-400">Format: JPG, PNG, WEBP. Maks. 3MB per foto.</p>
+                    </div>
+
+                    {{-- Preview Foto --}}
+                    <div id="foto-preview-container" class="hidden">
+                        <p class="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                            Preview <span id="foto-count" class="text-slate-400"></span>
+                        </p>
+                        <div id="foto-preview-grid"
+                            class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        </div>
+                    </div>
+
                     {{-- Buttons --}}
                     <div class="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                         <a href="{{ route('kerusakan.index') }}"
@@ -125,3 +149,50 @@
         </div>
     </section>
 @endsection
+
+@push('scripts')
+    <script>
+        const input = document.getElementById('foto');
+        const container = document.getElementById('foto-preview-container');
+        const grid = document.getElementById('foto-preview-grid');
+        const countEl = document.getElementById('foto-count');
+
+        input.addEventListener('change', function () {
+            grid.innerHTML = '';
+            const files = this.files;
+
+            if (files.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            if (files.length > 5) {
+                alert('Maksimal 5 foto per laporan.');
+                this.value = '';
+                container.classList.add('hidden');
+                return;
+            }
+
+            countEl.textContent = '(' + files.length + ' foto)';
+            container.classList.remove('hidden');
+
+            Array.from(files).forEach((file, i) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const div = document.createElement('div');
+                    div.className = 'relative group overflow-hidden rounded-xl border border-black/10';
+                    div.innerHTML = `
+                        <img src="${ev.target.result}" alt="Preview ${i + 1}"
+                            class="h-32 w-full object-cover" />
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                            <span class="text-xs font-semibold text-white">${file.name.substring(0, 20)}</span>
+                        </div>
+                    `;
+                    grid.appendChild(div);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+    </script>
+@endpush
+

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\FotoKerusakan;
 use App\Models\Kerusakan;
 use App\Models\Sekolah;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class KerusakanController extends Controller
 {
@@ -16,14 +18,11 @@ class KerusakanController extends Controller
     public function index(Request $request)
     {
         $user  = Auth::user();
-        $query = Kerusakan::with(['sekolah', 'user'])->latest();
+        $query = Kerusakan::with(['sekolah', 'user', 'fotos'])->latest();
 
-        // Operator hanya lihat kerusakan sekolah yang dia kelola
-        if ($user->isOperator()) {
-            $operatorSekolahIds = Sekolah::where('operator_id', $user->operator?->id)
-                ->pluck('id');
-            $query->whereIn('sekolah_id', $operatorSekolahIds);
-        }
+        // Filter berdasarkan akses sekolah user
+        $sekolahIds = $user->getSekolahIds();
+        $query->when($sekolahIds !== null, fn($q) => $q->whereIn('sekolah_id', $sekolahIds));
 
         // Filter by kondisi
         if ($request->filled('kondisi')) {
@@ -48,29 +47,28 @@ class KerusakanController extends Controller
 
     /**
      * Form buat laporan kerusakan baru.
+     * Dropdown sekolah sudah difilter sesuai hak akses.
      */
     public function create()
     {
         $user = Auth::user();
+        $sekolahIds = $user->getSekolahIds();
 
-        // Admin bisa pilih semua sekolah, operator hanya sekolahnya
-        if ($user->isAdmin()) {
-            $sekolahs = Sekolah::orderBy('nama')->get();
-        } else {
-            $sekolahs = Sekolah::where('operator_id', $user->operator?->id)
-                ->orderBy('nama')->get();
-        }
+        $sekolahs = Sekolah::orderBy('nama')
+            ->when($sekolahIds !== null, fn($q) => $q->whereIn('id', $sekolahIds))
+            ->get();
 
         return view('pages.kerusakan.create', [
-            'active'    => 'kerusakan',
-            'sekolahs'  => $sekolahs,
-            'jenisOpts' => Kerusakan::JENIS_OPTIONS,
+            'active'      => 'kerusakan',
+            'sekolahs'    => $sekolahs,
+            'jenisOpts'   => Kerusakan::JENIS_OPTIONS,
             'kondisiOpts' => Kerusakan::KONDISI_OPTIONS,
         ]);
     }
 
     /**
      * Simpan laporan baru.
+     * Validasi ganda: Laravel validation + cek akses sekolah.
      */
     public function store(Request $request)
     {
@@ -80,6 +78,8 @@ class KerusakanController extends Controller
             'jumlah_kerusakan' => 'required|integer|min:1',
             'kondisi'          => 'required|in:Ringan,Sedang,Berat',
             'deskripsi'        => 'nullable|string|max:1000',
+            'foto'             => 'nullable|array|max:5',
+            'foto.*'           => 'image|mimes:jpg,jpeg,png,webp|max:3072',
         ], [
             'sekolah_id.required' => 'Pilih sekolah terlebih dahulu.',
             'jenis.required'      => 'Jenis fasilitas wajib diisi.',
@@ -87,19 +87,19 @@ class KerusakanController extends Controller
             'jumlah_kerusakan.min'      => 'Jumlah kerusakan minimal 1.',
             'kondisi.required'    => 'Pilih kondisi kerusakan.',
             'kondisi.in'          => 'Kondisi tidak valid.',
+            'foto.max'            => 'Maksimal 5 foto per laporan.',
+            'foto.*.image'        => 'Setiap file harus berupa gambar.',
+            'foto.*.mimes'        => 'Format yang diizinkan: JPG, PNG, WEBP.',
+            'foto.*.max'          => 'Ukuran setiap foto maksimal 3MB.',
         ]);
 
-        // Validasi akses operator
+        // ⛔ Cek akses: operator tidak bisa lapor sekolah orang lain
         $user = Auth::user();
-        if ($user->isOperator()) {
-            $allowed = Sekolah::where('operator_id', $user->operator?->id)
-                ->where('id', $request->sekolah_id)->exists();
-            if (! $allowed) {
-                abort(403, 'Anda tidak memiliki akses ke sekolah ini.');
-            }
+        if (! $user->canAccessSekolah($request->sekolah_id)) {
+            abort(403, 'Anda tidak memiliki akses ke sekolah ini.');
         }
 
-        Kerusakan::create([
+        $kerusakan = Kerusakan::create([
             'sekolah_id'       => $request->sekolah_id,
             'jenis'            => $request->jenis,
             'jumlah_kerusakan' => $request->jumlah_kerusakan,
@@ -108,17 +108,36 @@ class KerusakanController extends Controller
             'user_id'          => $user->id,
         ]);
 
+        // Upload semua foto
+        if ($request->hasFile('foto')) {
+            foreach ($request->file('foto') as $file) {
+                $path = $file->store('kerusakan/' . $request->sekolah_id, 'public');
+                FotoKerusakan::create([
+                    'kerusakan_id' => $kerusakan->id,
+                    'file_foto'    => $path,
+                ]);
+            }
+        }
+
         return redirect()->route('kerusakan.index')
             ->with('success', 'Laporan kerusakan berhasil ditambahkan.');
     }
 
     /**
-     * Hapus laporan (hanya admin).
+     * Hapus laporan (hanya admin via middleware).
      */
     public function destroy($id)
     {
-        $kerusakan = Kerusakan::findOrFail($id);
-        $kerusakan->delete();
+        $kerusakan = Kerusakan::with('fotos')->findOrFail($id);
+
+        // Hapus semua file foto dari storage
+        foreach ($kerusakan->fotos as $foto) {
+            if (Storage::disk('public')->exists($foto->file_foto)) {
+                Storage::disk('public')->delete($foto->file_foto);
+            }
+        }
+
+        $kerusakan->delete(); // fotos dihapus otomatis via cascade
 
         return redirect()->route('kerusakan.index')
             ->with('success', 'Laporan kerusakan berhasil dihapus.');

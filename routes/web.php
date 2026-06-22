@@ -7,21 +7,40 @@ Route::get('/', function () {
 })->name('map');
 
 Route::get('/sekolah', function (\Illuminate\Http\Request $request) {
-    $search = $request->query('search');
+    $search      = $request->query('search');
+    $kecamatanId = $request->query('kecamatan');
+    $akreditasi  = $request->query('akreditasi');
 
     $query = App\Models\Sekolah::with(['kecamatan', 'kelurahan']);
 
+    // Search nama / NPSN
     if ($search) {
-        $query->where('nama', 'like', "%{$search}%")
-            ->orWhere('npsn', 'like', "%{$search}%");
+        $query->where(function ($q) use ($search) {
+            $q->where('nama', 'like', "%{$search}%")
+              ->orWhere('npsn', 'like', "%{$search}%");
+        });
     }
 
-    $schools = $query->paginate(15)->withQueryString();
+    // Filter kecamatan
+    if ($kecamatanId) {
+        $query->whereHas('kelurahan', fn($q) => $q->where('kecamatan_id', $kecamatanId));
+    }
+
+    // Filter akreditasi
+    if ($akreditasi) {
+        $query->where('akreditasi', $akreditasi);
+    }
+
+    $schools    = $query->orderBy('nama')->paginate(15)->withQueryString();
+    $kecamatans = App\Models\Kecamatan::orderBy('nama')->get();
 
     return view('pages.schools.index', [
-        'active' => 'daftar',
-        'schools' => $schools,
-        'search' => $search
+        'active'       => 'daftar',
+        'schools'      => $schools,
+        'search'       => $search,
+        'kecamatans'   => $kecamatans,
+        'kecamatanId'  => $kecamatanId,
+        'akreditasi'   => $akreditasi,
     ]);
 })->name('schools.index');
 
@@ -30,7 +49,7 @@ Route::get('/statistik', function () {
 })->name('statistics.index');
 
 Route::get('/sekolah/{id}', function ($id) {
-    $school = App\Models\Sekolah::with(['fasilitas', 'kecamatan', 'kelurahan', 'operator'])->findOrFail($id);
+    $school = App\Models\Sekolah::with(['fasilitas', 'kecamatan', 'kelurahan', 'operator', 'galeri'])->findOrFail($id);
     return view('pages.schools.show', [
         'active' => 'daftar',
         'school' => $school
@@ -46,8 +65,31 @@ Route::middleware(['auth', 'role:admin,operator'])->group(function () {
     Route::get('/kerusakan', [App\Http\Controllers\KerusakanController::class, 'index'])->name('kerusakan.index');
     Route::get('/kerusakan/create', [App\Http\Controllers\KerusakanController::class, 'create'])->name('kerusakan.create');
     Route::post('/kerusakan', [App\Http\Controllers\KerusakanController::class, 'store'])->name('kerusakan.store');
+
+    // Galeri foto
+    Route::get('/sekolah/{sekolah}/galeri/upload', [App\Http\Controllers\GaleriController::class, 'create'])->name('galeri.create');
+    Route::post('/sekolah/{sekolah}/galeri', [App\Http\Controllers\GaleriController::class, 'store'])->name('galeri.store');
+    Route::delete('/galeri/{id}', [App\Http\Controllers\GaleriController::class, 'destroy'])->name('galeri.destroy');
+
+    // Edit sekolah (admin: semua, operator: hanya sekolahnya — dicek di controller)
+    Route::get('/sekolah/{id}/edit', [App\Http\Controllers\SekolahController::class, 'edit'])->name('schools.edit');
+    Route::put('/sekolah/{id}', [App\Http\Controllers\SekolahController::class, 'update'])->name('schools.update');
 });
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::delete('/kerusakan/{id}', [App\Http\Controllers\KerusakanController::class, 'destroy'])->name('kerusakan.destroy');
+
+    // Manajemen Operator (hanya admin)
+    Route::get('/operator', [App\Http\Controllers\OperatorController::class, 'index'])->name('operator.index');
+    Route::get('/operator/create', [App\Http\Controllers\OperatorController::class, 'create'])->name('operator.create');
+    Route::post('/operator', [App\Http\Controllers\OperatorController::class, 'store'])->name('operator.store');
+    Route::get('/operator/{id}/edit', [App\Http\Controllers\OperatorController::class, 'edit'])->name('operator.edit');
+    Route::put('/operator/{id}', [App\Http\Controllers\OperatorController::class, 'update'])->name('operator.update');
+    Route::delete('/operator/{id}', [App\Http\Controllers\OperatorController::class, 'destroy'])->name('operator.destroy');
+
+    // Kelola Sekolah - Tambah, Hapus & Ekspor (hanya admin)
+    Route::get('/sekolah-tambah', [App\Http\Controllers\SekolahController::class, 'create'])->name('schools.create');
+    Route::post('/sekolah', [App\Http\Controllers\SekolahController::class, 'store'])->name('schools.store');
+    Route::delete('/sekolah/{id}', [App\Http\Controllers\SekolahController::class, 'destroy'])->name('schools.destroy');
+    Route::get('/sekolah-ekspor', [App\Http\Controllers\SekolahController::class, 'export'])->name('schools.export');
 });

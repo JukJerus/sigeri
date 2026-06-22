@@ -28,6 +28,11 @@
         if (Auth::check() && Auth::user()->hasRole('admin', 'operator')) {
             $navItems[] = ['key' => 'kerusakan', 'label' => 'Lapor Kerusakan', 'href' => route('kerusakan.index')];
         }
+
+        // Tampilkan menu Kelola Operator hanya untuk admin
+        if (Auth::check() && Auth::user()->isAdmin()) {
+            $navItems[] = ['key' => 'operator', 'label' => 'Kelola Operator', 'href' => route('operator.index')];
+        }
     @endphp
 
     <div class="relative min-h-screen overflow-hidden">

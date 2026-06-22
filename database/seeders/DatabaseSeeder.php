@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
@@ -34,21 +35,6 @@ class DatabaseSeeder extends Seeder
             'password' => Hash::make('admin123'),
         ]);
 
-        // ── Operator User ──────────────────────────────
-        $operatorUser = User::create([
-            'role_id'  => $operatorRole->id,
-            'username' => 'operator',
-            'email'    => 'operator@sigeri.test',
-            'password' => Hash::make('operator123'),
-        ]);
-
-        Operator::create([
-            'user_id' => $operatorUser->id,
-            'nama'    => 'Operator Demo',
-            'telepon' => '081234567890',
-            'alamat'  => 'Kota Bekasi',
-        ]);
-
         // ── Import CSV ─────────────────────────────────
         $csvPath = storage_path('app/import/gabungan_horizontal.csv');
 
@@ -60,24 +46,31 @@ class DatabaseSeeder extends Seeder
         $handle = fopen($csvPath, 'r');
         $header = fgetcsv($handle); // baca header
 
-        // Cache kecamatan & kelurahan agar tidak query berulang
+        // Cache agar tidak query berulang
         $kecamatanCache = [];
         $kelurahanCache = [];
+        $operatorCache  = [];  // key: nama_operator (lowercase) => Operator model
+        $usernameCount  = [];  // untuk handle username duplikat
 
-        $count = 0;
+        $countSekolah   = 0;
+        $countOperator  = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
             if (count($row) < 29) {
-                continue; // skip baris tidak lengkap
+                continue;
             }
 
-            // Map kolom CSV ke variabel
+            // Map kolom CSV
             $nama       = trim($row[0]);
             $npsn       = trim($row[1]);
-            $desa       = trim($row[4]);  // Kelurahan/Desa
-            $kecNama    = trim($row[5]);  // Kecamatan
+            $desa       = trim($row[4]);
+            $kecNama    = trim($row[5]);
             $alamat     = trim($row[23]);
             $akreditasi = trim($row[28]) ?: null;
+
+            // Operator dari CSV
+            $namaOperator  = trim($row[25] ?? '');
+            $teleponOperator = $this->cleanPhone(trim($row[26] ?? ''));
 
             // Fasilitas
             $jumlahKelas        = $this->toInt($row[6]);
@@ -99,7 +92,6 @@ class DatabaseSeeder extends Seeder
             $jumlahGuru           = $this->toInt($row[21]);
             $jumlahTendik         = $this->toInt($row[22]);
 
-            // Skip jika NPSN kosong
             if (empty($npsn)) {
                 continue;
             }
@@ -120,6 +112,50 @@ class DatabaseSeeder extends Seeder
             }
             $kelurahan = $kelurahanCache[$kelKey];
 
+            // ── Buat/cache operator ────────────────────
+            $operatorId = null;
+            if (! empty($namaOperator)) {
+                $opKey = Str::lower($namaOperator);
+
+                if (! isset($operatorCache[$opKey])) {
+                    // Buat username unik dari nama operator
+                    $baseUsername = Str::slug($namaOperator, '_');
+                    if (empty($baseUsername)) {
+                        $baseUsername = 'operator';
+                    }
+
+                    // Handle username duplikat
+                    $username = $baseUsername;
+                    if (isset($usernameCount[$baseUsername])) {
+                        $usernameCount[$baseUsername]++;
+                        $username = $baseUsername . '_' . $usernameCount[$baseUsername];
+                    } else {
+                        $usernameCount[$baseUsername] = 1;
+                    }
+
+                    // Buat user account
+                    $user = User::create([
+                        'role_id'  => $operatorRole->id,
+                        'username' => $username,
+                        'email'    => $username . '@sigeri.test',
+                        'password' => Hash::make('operator123'),
+                    ]);
+
+                    // Buat data operator
+                    $operator = Operator::create([
+                        'user_id' => $user->id,
+                        'nama'    => $namaOperator,
+                        'telepon' => $teleponOperator ?: null,
+                        'alamat'  => null,
+                    ]);
+
+                    $operatorCache[$opKey] = $operator;
+                    $countOperator++;
+                }
+
+                $operatorId = $operatorCache[$opKey]->id;
+            }
+
             // Buat sekolah
             $sekolah = Sekolah::create([
                 'nama'                   => $nama,
@@ -134,7 +170,7 @@ class DatabaseSeeder extends Seeder
                 'jumlah_siswa_perempuan' => $jumlahSiswaPerempuan,
                 'jumlah_tendik'          => $jumlahTendik,
                 'jumlah_guru'            => $jumlahGuru,
-                'operator_id'            => null,
+                'operator_id'            => $operatorId,
             ]);
 
             // Buat fasilitas
@@ -153,12 +189,12 @@ class DatabaseSeeder extends Seeder
                 'jumlah_wcs_perempuan' => $jumlahWcsPerempuan,
             ]);
 
-            $count++;
+            $countSekolah++;
         }
 
         fclose($handle);
 
-        $this->command->info("Berhasil import {$count} sekolah dari CSV.");
+        $this->command->info("Berhasil import {$countSekolah} sekolah dan {$countOperator} operator dari CSV.");
     }
 
     /**
@@ -168,5 +204,38 @@ class DatabaseSeeder extends Seeder
     {
         $value = trim($value ?? '');
         return $value !== '' ? (int) $value : null;
+    }
+
+    /**
+     * Bersihkan format nomor telepon.
+     * Tambahkan prefix 0 jika diawali 8, hapus karakter non-digit.
+     */
+    private function cleanPhone(?string $phone): ?string
+    {
+        if (empty($phone)) {
+            return null;
+        }
+
+        // Hapus spasi, tanda hubung, tanda +
+        $phone = preg_replace('/[\s\-\+]/', '', $phone);
+
+        // Hapus karakter non-digit kecuali sudah bersih
+        $phone = preg_replace('/[^0-9]/', '', $phone);
+
+        if (empty($phone) || $phone === '0') {
+            return null;
+        }
+
+        // Ganti awalan 62 dengan 0
+        if (str_starts_with($phone, '62')) {
+            $phone = '0' . substr($phone, 2);
+        }
+
+        // Tambahkan 0 di depan jika diawali 8
+        if (str_starts_with($phone, '8')) {
+            $phone = '0' . $phone;
+        }
+
+        return $phone;
     }
 }
