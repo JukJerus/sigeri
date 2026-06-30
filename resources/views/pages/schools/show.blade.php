@@ -139,14 +139,53 @@
                             <p class="mt-2 text-sm font-medium text-slate-900">{{ $school->alamat }}, Kec.
                                 {{ $school->kecamatan->nama ?? '-' }}, Kel. {{ $school->kelurahan->nama ?? '-' }}</p>
                         </div>
+                        
+                        <hr class="border-black/5" />
+
                         <div class="grid gap-4 sm:grid-cols-2">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs uppercase tracking-[0.2em] text-slate-500">NPSN</span>
-                                <span class="font-semibold text-slate-900">{{ $school->npsn }}</span>
+                            <div class="space-y-1">
+                                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">NPSN</p>
+                                <p class="font-semibold text-slate-900">{{ $school->npsn }}</p>
                             </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs uppercase tracking-[0.2em] text-slate-500">Operator</span>
-                                <span class="font-semibold text-slate-900">{{ $school->operator->nama ?? '-' }}</span>
+                            <div class="space-y-1">
+                                <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Operator Sekolah</p>
+                                @if($school->operator)
+                                    <p class="font-semibold text-slate-900">{{ $school->operator->nama }}</p>
+                                    @if($school->operator->telepon)
+                                        @php
+                                            $telepon = $school->operator->telepon;
+                                            $cleanNumber = preg_replace('/[^0-9]/', '', $telepon);
+                                            if (str_starts_with($cleanNumber, '0')) {
+                                                $cleanNumber = '62' . substr($cleanNumber, 1);
+                                            }
+                                            $waUrl = "https://wa.me/{$cleanNumber}";
+                                        @endphp
+                                        <div class="mt-2 flex flex-wrap gap-2">
+                                            <!-- WhatsApp Link -->
+                                            <a href="{{ $waUrl }}" target="_blank" rel="noopener noreferrer"
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200 transition hover:bg-emerald-100">
+                                                <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.713-1.455L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.965C16.588 2.01 14.12 1.01 11.48 1.01c-5.442 0-9.866 4.372-9.87 9.802 0 1.772.487 3.502 1.412 5.065L1.96 20.54l4.687-1.386z"/>
+                                                    <path d="M17.486 14.28c-.3-.15-1.774-.875-2.05-.975-.275-.1-.475-.15-.675.15-.2.3-.775.975-.95 1.175-.175.2-.35.225-.65.075-.3-.15-1.263-.465-2.404-1.485-.888-.79-1.487-1.77-1.662-2.07-.175-.3-.02-.46.13-.61.137-.135.3-.35.45-.525.15-.175.2-.3.3-.5.1-.2.05-.375-.025-.525-.075-.15-.675-1.625-.925-2.225-.244-.589-.493-.51-.675-.52-.175-.01-.375-.01-.575-.01-.2 0-.525.075-.8 1.025-.275.95-1.05 3.1-1.05 3.2 0 .1.1.2.223.337.525.59 1.565 1.72 3.39 2.51.84.36 1.5.58 2.01.74.84.27 1.6.23 2.2.14.67-.1 1.774-.725 2.025-1.39.25-.665.25-1.24.175-1.39-.075-.15-.275-.25-.575-.4z"/>
+                                                </svg>
+                                                Chat WA
+                                            </a>
+                                            <!-- Fallback: Direct Phone Call -->
+                                            <a href="tel:{{ $telepon }}"
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 ring-1 ring-slate-200 transition hover:bg-slate-200"
+                                                title="Jika WhatsApp tidak aktif, hubungi via telepon biasa">
+                                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                </svg>
+                                                Telepon
+                                            </a>
+                                        </div>
+                                    @else
+                                        <p class="text-xs text-slate-400">Nomor telepon tidak tersedia</p>
+                                    @endif
+                                @else
+                                    <p class="font-medium text-slate-500">Belum ditugaskan</p>
+                                @endif
                             </div>
                         </div>
                     </div>

@@ -17,6 +17,7 @@ class KerusakanController extends Controller
      */
     public function index(Request $request)
     {
+        /** @var \App\Models\User $user */
         $user  = Auth::user();
         $query = Kerusakan::with(['sekolah', 'user', 'fotos'])->latest();
 
@@ -51,6 +52,7 @@ class KerusakanController extends Controller
      */
     public function create()
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         $sekolahIds = $user->getSekolahIds();
 
@@ -93,7 +95,8 @@ class KerusakanController extends Controller
             'foto.*.max'          => 'Ukuran setiap foto maksimal 3MB.',
         ]);
 
-        // ⛔ Cek akses: operator tidak bisa lapor sekolah orang lain
+        // Cek akses: operator tidak bisa lapor sekolah orang lain
+        /** @var \App\Models\User $user */
         $user = Auth::user();
         if (! $user->canAccessSekolah($request->sekolah_id)) {
             abort(403, 'Anda tidak memiliki akses ke sekolah ini.');
@@ -141,5 +144,77 @@ class KerusakanController extends Controller
 
         return redirect()->route('kerusakan.index')
             ->with('success', 'Laporan kerusakan berhasil dihapus.');
+    }
+
+    /**
+     * Ekspor data kerusakan ke CSV (admin only).
+     */
+    public function export(Request $request)
+    {
+        $query = Kerusakan::with(['sekolah.kelurahan.kecamatan', 'user', 'fotos'])->latest();
+
+        // Filter kondisi
+        if ($request->filled('kondisi')) {
+            $query->where('kondisi', $request->kondisi);
+        }
+
+        // Search nama sekolah
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->whereHas('sekolah', fn($q) => $q->where('nama', 'like', "%{$search}%"));
+        }
+
+        $kerusakans = $query->get();
+
+        $headers = [
+            'No',
+            'Nama Sekolah',
+            'NPSN',
+            'Kecamatan',
+            'Kelurahan',
+            'Jenis Fasilitas',
+            'Jumlah Kerusakan',
+            'Kondisi',
+            'Deskripsi',
+            'Dilaporkan Oleh',
+            'Tanggal Laporan',
+            'Jumlah Foto',
+        ];
+
+        $callback = function () use ($kerusakans, $headers) {
+            $file = fopen('php://output', 'w');
+
+            // BOM UTF-8 supaya Excel bisa baca karakter Indonesia
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, $headers);
+
+            foreach ($kerusakans as $i => $item) {
+                $sekolah = $item->sekolah;
+                fputcsv($file, [
+                    $i + 1,
+                    $sekolah?->nama ?? '-',
+                    $sekolah?->npsn ?? '-',
+                    $sekolah?->kelurahan?->kecamatan?->nama ?? '-',
+                    $sekolah?->kelurahan?->nama ?? '-',
+                    $item->jenis,
+                    $item->jumlah_kerusakan,
+                    $item->kondisi,
+                    $item->deskripsi ?? '-',
+                    $item->user?->username ?? '-',
+                    $item->created_at?->format('d/m/Y H:i') ?? '-',
+                    $item->fotos?->count() ?? 0,
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        $filename = 'laporan_kerusakan_' . now()->format('Y-m-d') . '.csv';
+
+        return response()->stream($callback, 200, [
+            'Content-Type'        => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 }

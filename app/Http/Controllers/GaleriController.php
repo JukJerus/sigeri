@@ -15,6 +15,7 @@ class GaleriController extends Controller
      */
     public function create($sekolahId)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         if (! $user->canAccessSekolah($sekolahId)) {
@@ -34,6 +35,7 @@ class GaleriController extends Controller
      */
     public function store(Request $request, $sekolahId)
     {
+        /** @var \App\Models\User $user */
         $user = Auth::user();
 
         if (! $user->canAccessSekolah($sekolahId)) {
@@ -73,6 +75,7 @@ class GaleriController extends Controller
     public function destroy($id)
     {
         $galeri = Galeri::findOrFail($id);
+        /** @var \App\Models\User $user */
         $user   = Auth::user();
 
         if (! $user->canAccessSekolah($galeri->sekolah_id)) {

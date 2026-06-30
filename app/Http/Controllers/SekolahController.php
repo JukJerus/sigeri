@@ -73,6 +73,7 @@ class SekolahController extends Controller
      */
     public function edit($id)
     {
+        /** @var \App\Models\User $user */
         $user   = Auth::user();
         $school = Sekolah::with('fasilitas')->findOrFail($id);
 
@@ -94,6 +95,7 @@ class SekolahController extends Controller
      */
     public function update(Request $request, $id)
     {
+        /** @var \App\Models\User $user */
         $user   = Auth::user();
         $school = Sekolah::with('fasilitas')->findOrFail($id);
 

@@ -129,6 +129,7 @@ Route::middleware(['auth', 'role:admin,operator'])->group(function () {
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::delete('/kerusakan/{id}', [App\Http\Controllers\KerusakanController::class, 'destroy'])->name('kerusakan.destroy');
+    Route::get('/kerusakan-ekspor', [App\Http\Controllers\KerusakanController::class, 'export'])->name('kerusakan.export');
 
     // Manajemen Operator (hanya admin)
     Route::get('/operator', [App\Http\Controllers\OperatorController::class, 'index'])->name('operator.index');
